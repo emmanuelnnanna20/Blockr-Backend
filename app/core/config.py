@@ -1,6 +1,5 @@
 from typing import List
-from pydantic import BaseSettings
-from pydantic import AnyHttpUrl, validator
+from pydantic import BaseSettings, AnyHttpUrl, validator
 
 
 class Settings(BaseSettings):
@@ -13,7 +12,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # Database
+    # Database - REQUIRED, no default
     DATABASE_URL: str
     
     # CORS
