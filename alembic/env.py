@@ -5,12 +5,14 @@ from alembic import context
 import sys
 from pathlib import Path
 
-# Add the project root to the path so we can import app modules
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Add the project root to the path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Import your models and config
+# Import settings and database
 from app.core.config import settings
-from app.db.base import Base  # This imports all models
+
+# Import Base and ALL models - this is critical for autogenerate
+from app.db.base import Base
 
 # this is the Alembic Config object
 config = context.config
@@ -19,20 +21,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Override the sqlalchemy.url from alembic.ini with our settings
+# Set the SQLAlchemy URL from settings
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-# add your model's MetaData object here for 'autogenerate' support
+# Set target metadata for autogenerate support
 target_metadata = Base.metadata
 
+
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
-    
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-    """
+    """Run migrations in 'offline' mode."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -46,26 +43,42 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode."""
+    import urllib.parse
     
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-    """
-    # IMPORTANT: Use the database.py engine instead of engine_from_config
-    # This ensures we use the same PyMySQL driver and SSL configuration
-    from app.db.database import engine
+    # Parse the DATABASE_URL to add PyMySQL driver
+    parsed = urllib.parse.urlparse(settings.DATABASE_URL)
     
-    with engine.connect() as connection:
+    # Extract components
+    username = urllib.parse.unquote(parsed.username or "")
+    password = urllib.parse.unquote(parsed.password or "")
+    host = parsed.hostname
+    port = parsed.port if parsed.port else 3306
+    database = parsed.path[1:] if parsed.path else ""
+    
+    # Build URL with PyMySQL driver
+    database_url = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
+    
+    # Create engine configuration
+    configuration = config.get_section(config.config_ini_section)
+    configuration["sqlalchemy.url"] = database_url
+    
+    # Add pymysql-specific configuration with SSL
+    connectable = engine_from_config(
+        configuration,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+        connect_args={
+            "ssl": {"ssl_mode": "REQUIRED"},
+            "charset": "utf8mb4"
+        }
+    )
+
+    with connectable.connect() as connection:
         context.configure(
-            connection=connection, 
+            connection=connection,
             target_metadata=target_metadata
         )
 
         with context.begin_transaction():
             context.run_migrations()
-
-
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    run_migrations_online()
