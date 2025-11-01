@@ -51,23 +51,11 @@ def run_migrations_online() -> None:
     In this scenario we need to create an Engine
     and associate a connection with the context.
     """
-    # Get the alembic config section and override the URL
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    # IMPORTANT: Use the database.py engine instead of engine_from_config
+    # This ensures we use the same PyMySQL driver and SSL configuration
+    from app.db.database import engine
     
-    # For cloud databases with SSL, add connect_args
-    connect_args = {}
-    if "ssl-mode=REQUIRED" in settings.DATABASE_URL or "ssl_mode=REQUIRED" in settings.DATABASE_URL:
-        connect_args["connect_args"] = {"ssl": {"ssl_mode": "REQUIRED"}}
-    
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        **connect_args
-    )
-
-    with connectable.connect() as connection:
+    with engine.connect() as connection:
         context.configure(
             connection=connection, 
             target_metadata=target_metadata
