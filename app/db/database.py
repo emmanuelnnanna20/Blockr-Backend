@@ -6,20 +6,25 @@ import urllib.parse
 # Parse DATABASE_URL
 parsed = urllib.parse.urlparse(settings.DATABASE_URL)
 
-# Extract components
+# Extract components with proper defaults
 username = urllib.parse.unquote(parsed.username or "")
 password = urllib.parse.unquote(parsed.password or "")
-host = parsed.hostname
-port = parsed.port
-database = parsed.path[1:]  # remove leading '/'
+host = parsed.hostname or "localhost"
+port = parsed.port if parsed.port is not None else 3306  # Default MySQL port
+database = parsed.path[1:] if parsed.path else ""  # remove leading '/'
 
 # Build clean URL WITHOUT any SSL params
 clean_url = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
 
 # SSL via connect_args (PyMySQL accepts this)
 connect_args = {}
-if "ssl" in parsed.query or "ssl_mode" in parsed.query:
-    connect_args["ssl_mode"] = "REQUIRED"  # or "PREFERRED"
+query_params = urllib.parse.parse_qs(parsed.query)
+
+# Check for ssl-mode or ssl_mode in query parameters
+if "ssl-mode" in query_params or "ssl_mode" in query_params:
+    connect_args["ssl"] = {"ssl_mode": "REQUIRED"}
+elif "ssl" in query_params:
+    connect_args["ssl"] = {"ssl_mode": "REQUIRED"}
 
 # Create engine
 engine = create_engine(
