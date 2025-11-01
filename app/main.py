@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router
+from app.db.database import engine
+from app.db.base import Base
+import sys
 
 # Create FastAPI app
 app = FastAPI(
@@ -19,6 +22,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Create database tables on startup
+@app.on_event("startup")
+async def startup_event():
+    """Create tables on startup if they don't exist"""
+    print("Checking/Creating database tables...", file=sys.stderr)
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✓ Database tables ready!", file=sys.stderr)
+    except Exception as e:
+        print(f"✗ Failed to create tables: {e}", file=sys.stderr)
+        raise
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
@@ -38,5 +53,3 @@ def root():
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
-
-# Add this line anywhere
