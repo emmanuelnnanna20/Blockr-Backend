@@ -38,3 +38,5 @@ def root():
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+# Add this line anywhere
